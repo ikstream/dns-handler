@@ -18,6 +18,7 @@ import socket
 import sys
 import threading
 import time
+import tldextract
 
 DOMAIN="sviks"
 
@@ -252,14 +253,13 @@ class Server():
 def parse_data(data):
     try:
         d = DNSRecord.parse(data)
-    except (buffer.BufferError, dns.DNSError) as e:
+    except (BufferError, DNSError) as e:
         print("Error occurred: {e}")
         return
 
     q = d.get_q()
-    print(d)
-
-    print(f"'Question: {q}")
+    domain = str(q).strip(';').split()[0]
+    print(domain)
 
 
 # Create a UDP socket
@@ -278,6 +278,7 @@ while True:
         len(data), address))
     if data:
         parse_data(data)
+        sock.sendto(data, address)
 
     data = None
 
