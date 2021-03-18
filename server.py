@@ -254,7 +254,7 @@ def parse_data(data):
     try:
         d = DNSRecord.parse(data)
     except (BufferError, DNSError) as e:
-        print("Error occurred: {e}")
+        print(f"Error occurred: {e}")
         return
 
     q = d.get_q()
