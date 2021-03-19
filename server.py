@@ -236,14 +236,6 @@ class Server():
                                         )
                 thread.start()
                 config.append_thread(mac, thread)
-                try:
-                    mqtt.send_message(mqtt_client, topic,
-                                      f"New Client: {config.client_ids[mac]}/"
-                                      f"{mac}")
-                except KeyError as e_k:
-                    log.warning(f"Client {mac} not configured. Can't notify via"
-                                f" MQTT")
-
                 log.info(f"started Thread: {thread}")
                 log.info(f"current topic {topic}")
 
@@ -262,25 +254,33 @@ def parse_data(data):
     print(domain)
 
 
-# Create a UDP socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+def init_listener():
+    # Create a UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Bind the socket to the port
-server_address = ('192.168.2.110', 10000)
-print('starting up on {} port {}'.format(*server_address))
-sock.bind(server_address)
-print('\nwaiting to receive message')
+    # Bind the socket to the port
+    server_address = ('192.168.2.110', 10000)
+    print('starting up on {} port {}'.format(*server_address))
+    sock.bind(server_address)
+    print('\nwaiting to receive message')
 
-while True:
-    data, address = sock.recvfrom(4096)
+    while True:
+        try:
+            data, address = sock.recvfrom(4096)
 
-    print('received {} bytes from {}'.format(
-        len(data), address))
-    if data:
-        parse_data(data)
-        sock.sendto(data, address)
+            print('received {} bytes from {}'.format(
+                len(data), address))
+            if data:
+                parse_data(data)
+                sock.sendto(data, address)
 
-    data = None
+            data = None
+        except KeyboardInterrupt as e:
+            print(f"\nCleaning up")
+            sock.close()
+            exit()
+
+init_listener()
 
 
 if __name__ == '__main__':
