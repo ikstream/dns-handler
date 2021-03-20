@@ -251,7 +251,10 @@ def parse_data(data):
 
     q = d.get_q()
     domain = str(q).strip(';').split()[0]
-    print(domain)
+    sep_domain = domain.split('.')
+    print(f"[2]: {domain[2]}, [3]: {domain[3]}")
+    if domain[:-2] in 'sviks' and domain[:-3] in 'owrt':
+        print()
 
 
 def init_listener():
