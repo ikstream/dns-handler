@@ -10,6 +10,7 @@ from dnslib.label import DNSBuffer
 from dnslib.buffer import BufferError
 from datetime import datetime
 
+import argparse
 import logging as log
 import os
 import queue
@@ -21,6 +22,8 @@ import time
 import tldextract
 
 DOMAIN="sviks"
+IP="localhost"
+PORT="53"
 
 class ReceiverThreadConfig():
     """
@@ -252,9 +255,11 @@ def parse_data(data):
     q = d.get_q()
     domain = str(q).strip(';').split()[0]
     sep_domain = domain.split('.')
-    print(f"[2]: {domain[2]}, [3]: {domain[3]}")
-    if domain[:-2] in 'sviks' and domain[:-3] in 'owrt':
-        print()
+    try:
+        if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt':
+            print(domain)
+    except:
+        return
 
 
 def init_listener():
@@ -262,7 +267,7 @@ def init_listener():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Bind the socket to the port
-    server_address = ('192.168.2.110', 10000)
+    server_address = (IP, int(PORT))
     print('starting up on {} port {}'.format(*server_address))
     sock.bind(server_address)
     print('\nwaiting to receive message')
@@ -275,7 +280,10 @@ def init_listener():
                 len(data), address))
             if data:
                 parse_data(data)
-                sock.sendto(data, address)
+                try:
+                    sock.sendto(data, address)
+                except OSError:
+                    pass
 
             data = None
         except KeyboardInterrupt as e:
@@ -283,9 +291,20 @@ def init_listener():
             sock.close()
             exit()
 
-init_listener()
 
 
 if __name__ == '__main__':
-    thread_config = ReceiverThreadConfig()
-    server = Server()
+    parser = argparse.ArgumentParser(description=
+                                     'Collect data send over DNS')
+    parser.add_argument('-i', '--ip',
+                        help='Port to listen on')
+    parser.add_argument('-p', '--port',
+                        help='Port to listen on')
+    arg = parser.parse_args()
+
+    if arg.ip:
+        IP=arg.ip
+    if arg.port:
+        PORT=arg.port
+
+    init_listener()
