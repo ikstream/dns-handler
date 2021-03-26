@@ -25,6 +25,9 @@ DOMAIN="sviks"
 IP="localhost"
 PORT="53"
 
+DATA_QUEUE = queue.Queue()
+USER_QUEUE = queue.Queue()
+
 class ReceiverThreadConfig():
     """
     Config for ReceiverThread class
@@ -194,55 +197,37 @@ class ReceiverThread(threading.Thread):
                 mqtt.send_message(self.mqtt_cli, topic,
                                   f"File written: {mac}: {wav_file_name}")
 
-class Server():
+class user_data():
+
+    def __init__(self, uid, msg_total):
+        self.id = uid
+        self.msg_total = msg_total
+        self.data = {}
+
+    def append_msg(self, msg_nr, msg_string):
+        self.data[msg_nr] = msg_string
+
+
+class data_proc():
     """
-    Threaded UDP Server
+    Data processing Thread
     """
 
     def __init__(self):
-        self.udp_port = 53
-        self.udp_host = ''
+        self.users = []
 
 
-    def start_server(self, config):
+    def start_server(self):
         """
         Start listening and start a thread per client
         """
-        try:
-            udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        except socket.error as msg:
-            log.error(f"Failed to create socket. Error Code: {str(msg.errno)}: "
-                      f"{msg.strerror}")
-
-        try:
-            udp_sock.bind((self.udp_host, self.udp_port))
-        except socket.error as msg:
-            log.error(f"Bind failed. Error: {str(msg.errno)}: {msg.strerror}")
-            sys.exit()
-
-        log.info('Server listening')
-#        tcp_thread = TcpThread(args={"host": self.tcp_host,
-#                                     "port": self.tcp_port,
-#                                     "udp_config": config})
-#        tcp_thread.start()
-
         while True:
-            udp_data = udp_sock.recvfrom(4096)[0]
-            config.add_data(mac, data)
+            if not DATA_QUEUE.empty():
+                data = DATA_QUEUE.get()
+                uid, msg_nr, msg_total = data[-5].split('-')
+                msg_string = ''.join(data[1:-5])
 
-            # check if there is a thread for this client
-            if not config.get_thread(mac):
-                thread = ReceiverThread(args={'address': mac},
-                                        kwargs={'config': config,
-                                                'mqtt_client': mqtt_client}
-                                        )
-                thread.start()
-                config.append_thread(mac, thread)
-                log.info(f"started Thread: {thread}")
-                log.info(f"current topic {topic}")
-
-        udp_sock.close()
+                if not self.users
 
 
 def parse_data(data):
@@ -257,6 +242,7 @@ def parse_data(data):
     sep_domain = domain.split('.')
     try:
         if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt':
+            DATA_QUEUE.put(sep_domain)
             print(domain)
     except:
         return
@@ -294,6 +280,7 @@ def init_listener():
 
 
 if __name__ == '__main__':
+    server = Server()
     parser = argparse.ArgumentParser(description=
                                      'Collect data send over DNS')
     parser.add_argument('-i', '--ip',
@@ -307,4 +294,5 @@ if __name__ == '__main__':
     if arg.port:
         PORT=arg.port
 
+    server.start_server()
     init_listener()
