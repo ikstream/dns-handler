@@ -203,6 +203,8 @@ class user_data():
         self.id = uid
         self.msg_total = msg_total
         self.data = {}
+        self.msg_cnt_received = 0
+        self.all_received = 0
 
     def append_msg(self, msg_nr, msg_string):
         self.data[msg_nr] = msg_string
@@ -227,7 +229,9 @@ class data_proc():
                 uid, msg_nr, msg_total = data[-5].split('-')
                 msg_string = ''.join(data[1:-5])
 
-                if not self.users
+                for u in self.users:
+                    if uid == u.id:
+                        u.append_msg(msg_nr,msg_string)
 
 
 def parse_data(data):
