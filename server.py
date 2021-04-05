@@ -9,6 +9,7 @@ from dnslib.dns import DNSQuestion, DNSError
 from dnslib.label import DNSBuffer
 from dnslib.buffer import BufferError
 from datetime import datetime
+from time import time
 
 import argparse
 import logging as log
@@ -18,7 +19,6 @@ import select
 import socket
 import sys
 import threading
-import time
 import tldextract
 
 DOMAIN="sviks"
@@ -197,7 +197,7 @@ class ReceiverThread(threading.Thread):
                 mqtt.send_message(self.mqtt_cli, topic,
                                   f"File written: {mac}: {wav_file_name}")
 
-class user_data():
+class UserData():
 
     def __init__(self, uid, msg_total):
         self.id = uid
@@ -205,33 +205,73 @@ class user_data():
         self.data = {}
         self.msg_cnt_received = 0
         self.all_received = 0
+        self.last_transmitt = 0
 
     def append_msg(self, msg_nr, msg_string):
         self.data[msg_nr] = msg_string
 
 
-class data_proc():
+class DataProcServer(threading.Thread):
     """
     Data processing Thread
     """
 
-    def __init__(self):
-        self.users = []
+    def __init__(self, group=None, target=None, name=None, args=(),
+                 kwargs=None, *, daemon=None):
+        super().__init__(group=group, target=target, name=name,
+                         daemon=daemon)
+        self.users = {}
+        self._stop = threading.Event()
 
 
-    def start_server(self):
+    def stop(self):
+        """Set stop event"""
+        self._stop.set()
+
+
+    def stopped(self):
+        """Checks if stop event is set"""
+        return self._stop.isSet()
+
+
+    def run(self):
         """
         Start listening and start a thread per client
         """
+        allowed_time_diff = 120  # max time diff allowed in seconds
+
         while True:
+
+            if self.stopped():
+                return
+
             if not DATA_QUEUE.empty():
                 data = DATA_QUEUE.get()
                 uid, msg_nr, msg_total = data[-5].split('-')
-                msg_string = ''.join(data[1:-5])
+                msg_string = ''.join(data[0:-5])
 
-                for u in self.users:
-                    if uid == u.id:
-                        u.append_msg(msg_nr,msg_string)
+                if uid in self.users:
+                    print(f"user {uid} exists")
+                    u = self.users[uid]
+
+                    if (int(time()) - u.last_transmitt) > allowed_time_diff:
+                        u.data = {}
+                else:
+                    print(f"creating user {uid}")
+                    u = UserData(uid, msg_total)
+                    self.users[uid] = u
+
+                print(f"last_transmitt: {u.last_transmitt}")
+
+                if not msg_nr in u.data:
+                    print(f"processing msg_nr {msg_nr}")
+                    u.last_transmitt = int(time())
+                    u.data[msg_nr] = msg_string
+
+                if len(u.data.keys()) == msg_total:
+                    u.last_transmitt = int(time())
+                    print(f"Adding user {uid} to queue")
+                    USER_QUEUE.put(u)
 
 
 def parse_data(data):
@@ -252,7 +292,7 @@ def parse_data(data):
         return
 
 
-def init_listener():
+def init_listener(server):
     # Create a UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -279,12 +319,12 @@ def init_listener():
         except KeyboardInterrupt as e:
             print(f"\nCleaning up")
             sock.close()
-            exit()
-
+            server.stop()
+            sys.exit()
 
 
 if __name__ == '__main__':
-    server = Server()
+    server = DataProcServer()
     parser = argparse.ArgumentParser(description=
                                      'Collect data send over DNS')
     parser.add_argument('-i', '--ip',
@@ -298,5 +338,5 @@ if __name__ == '__main__':
     if arg.port:
         PORT=arg.port
 
-    server.start_server()
-    init_listener()
+    server.start()
+    init_listener(server)
