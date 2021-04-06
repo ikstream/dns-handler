@@ -194,6 +194,7 @@ class DataProcServer(threading.Thread):
                     continue
 
                 uid, msg_nr, msg_total = data[-5].split('-')
+                uid = uid.lower()
                 msg_string = ''.join(data[0:-5])
 
                 if uid in self.users:
@@ -236,7 +237,7 @@ def parse_data(data):
     domain = str(q).strip(';').split()[0]
     sep_domain = domain.split('.')
     try:
-        if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt':
+        if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt' and len(sep_domain) > 6:
             DATA_QUEUE.put(sep_domain)
             print(domain)
     except:
