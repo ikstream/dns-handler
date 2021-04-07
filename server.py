@@ -80,6 +80,27 @@ class UserProcServer(threading.Thread):
         return self._stop.isSet()
 
 
+    def store_data(self, uid, msg):
+        """
+        Store userdata to disk
+        """
+        storage_path = f"{os.getcwd()}/user_data"
+
+        if not os.path.isdir(storage_path):
+            try:
+                os.makedirs(storage_path)
+            except Exception as e:
+                print("Error occured during user directory creation: {e}")
+
+        user_file=f"{storage_path}/{uid}"
+
+        with open(user_file, 'a') as u_file:
+            try:
+                u_file.write(f"{datetime.utcnow()};{msg}\n")
+            except Exception as e:
+                print(f"Error occured during file write: {e}")
+
+
     def run(self):
         """Process user data if available"""
 
@@ -111,7 +132,6 @@ class UserProcServer(threading.Thread):
                     except ValueError as ve:
                         print(f"Value Error occured on transmitted data: {ve}")
                         raise UserHandlerException("Could not decode msg from Hex")
-
                     try:
                         decoded_bytes = base64.b64decode(b64_msg)
                     except Exception as e:
@@ -135,7 +155,12 @@ class UserProcServer(threading.Thread):
                         print(f"Error occured, while decrypt")
                         raise UserHandlerException("Could not Decrypt msg with openssl")
 
-                    print(f"clear text: {decrypted}")
+                    try:
+                        self.store_data(uid, decrypted)
+                        print(f"user data stored for {uid}")
+                    except Exception as e:
+                        raise UserHandlerException("Could not store user data: {e}")
+
                     try:
                         os.remove(tmp_crypt_file)
                     except Exception as e:
@@ -198,32 +223,24 @@ class DataProcServer(threading.Thread):
                 msg_string = ''.join(data[0:-5])
 
                 if uid in self.users:
-                    print(f"user {uid} exists")
                     u = self.users[uid]
 
                     if (int(time()) - u.last_transmitt) > allowed_time_diff:
                         u.data = {}
                 else:
-                    print(f"creating user {uid}")
                     u = UserData(uid, msg_total)
                     self.users[uid] = u
 
-                print(f"last_transmitt: {u.last_transmitt}")
 
                 if not msg_nr in u.data:
-                    print(f"processing msg_nr {msg_nr} )")
                     u.last_transmitt = int(time())
                     u.data[msg_nr] = msg_string
-                    print(f"nr_keys: {len(u.data.keys())}/{msg_total}")
 
                 if int(len(u.data.keys())) == int(msg_total):
                     u.last_transmitt = int(time())
-                    print(f"Adding user {uid} to queue")
                     DATA_QUEUE.task_done()
                     USER_QUEUE.put(u)
                     del self.users[uid]
-                else:
-                    print(f"somthing went wrong")
 
 
 def parse_data(data):
@@ -239,7 +256,6 @@ def parse_data(data):
     try:
         if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt' and len(sep_domain) > 6:
             DATA_QUEUE.put(sep_domain)
-            print(domain)
     except:
         return
 
