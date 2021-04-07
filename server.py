@@ -23,6 +23,8 @@ import sys
 import threading
 import tldextract
 
+SERVER_VERSION="0.1.0"
+
 DOMAIN="sviks"
 IP="localhost"
 PORT="53"
@@ -289,7 +291,7 @@ def init_listener(data_server, user_server):
             sock.close()
             data_server.stop()
             user_server.stop()
-            sys.exit()
+            sys.exit(0)
 
 
 if __name__ == '__main__':
@@ -304,7 +306,14 @@ if __name__ == '__main__':
                         help='Port to listen on')
     parser.add_argument('-k', '--key',
                         help='Path to key file')
+    parser.add_argument('-V', '--version',
+                        help='Print version of Server',
+                        action='store_true')
     arg = parser.parse_args()
+
+    if arg.version:
+        print(f"Server Version: {SERVER_VERSION}")
+        sys.exit(0)
 
     if arg.ip:
         IP = arg.ip
