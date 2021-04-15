@@ -43,7 +43,7 @@ import sys
 import threading
 import tldextract
 
-SERVER_VERSION="0.1.0"
+SERVER_VERSION="0.1.1"
 
 DOMAIN="sviks"
 IP="localhost"
@@ -158,7 +158,7 @@ class UserProcServer(threading.Thread):
                         decoded_bytes = base64.b64decode(b64_msg)
                     except Exception as e:
                         print(f"Something went wrong decoding raw message: {e}\n"
-                              f"Message was: {raw_msg}")
+                              f"Message was: {b64_msg}")
                         raise UserHandlerException("Could not decode Base64")
 
                     try:
