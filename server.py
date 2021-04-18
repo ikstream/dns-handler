@@ -45,6 +45,9 @@ import tldextract
 
 SERVER_VERSION="0.1.1"
 
+DB_USER=''
+DB_PW=''
+
 DOMAIN="sviks"
 IP="localhost"
 PORT="53"
@@ -329,6 +332,10 @@ if __name__ == '__main__':
     parser.add_argument('-V', '--version',
                         help='Print version of Server',
                         action='store_true')
+    parser.add_argument('--dbuser',
+                        help='database user name')
+    parser.add_argument('--dbpassword',
+                        help='Database password')
     arg = parser.parse_args()
 
     if arg.version:
@@ -342,6 +349,12 @@ if __name__ == '__main__':
 
     if arg.key:
         key = arg.key
+
+    if arg.dbuser:
+        DB_USER = arg.dbuser
+
+    if arg.sdpassword:
+        DB_PW = arg.dbpassword
 
     data_server.start()
     user_server = UserProcServer(args={'key': key})
