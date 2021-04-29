@@ -45,7 +45,7 @@ import sys
 import threading
 import tldextract
 
-SERVER_VERSION="0.1.2"
+SERVER_VERSION="0.1.3"
 
 DOMAIN="sviks"
 IP="localhost"
@@ -306,7 +306,12 @@ def init_listener(data_server, user_server):
             data, address = sock.recvfrom(4096)
 
             if data:
-                question, dom = parse_data(data)
+                try:
+                    question, dom = parse_data(data)
+                except Exception as e:
+                    print(f"Error occurred with {data}: {e}")
+                    continue
+
                 try:
                     if question:
                         d = DNSRecord(DNSHeader(qr=1,aa=1,ra=1),
