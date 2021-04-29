@@ -29,8 +29,9 @@ from dnslib.dns import DNSQuestion, DNSError
 from dnslib.label import DNSBuffer
 from dnslib.buffer import BufferError
 from datetime import datetime
-from time import time
+from requests import get
 from subprocess import check_output
+from time import time
 
 import argparse
 import base64
@@ -271,20 +272,25 @@ def parse_data(data):
     except (BufferError, DNSError) as e:
         print(f"Error occurred: {e}")
         return
-
+    dom = ''
     q = d.get_q()
     domain = str(q).strip(';').split()[0]
     sep_domain = domain.split('.')
     try:
-        if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt' and len(sep_domain) > 6:
-            DATA_QUEUE.put(sep_domain)
+        if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt':
+            dom = q
+            if len(sep_domain) > 6:
+                DATA_QUEUE.put(sep_domain)
     except:
         return
+
+    return dom
 
 
 def init_listener(data_server, user_server):
     # Create a UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    ip = get('https://api.ipify.org').text
 
     # Bind the socket to the port
     server_address = (IP, int(PORT))
@@ -298,14 +304,24 @@ def init_listener(data_server, user_server):
 
             print('received {} bytes from {}'.format(
                 len(data), address))
+
             if data:
-                parse_data(data)
+                q = parse_data(data)
                 try:
-                    sock.sendto(data, address)
-                except OSError:
+                    if q:
+                        a = data.reply()
+                        a.add_answer(RR(q,QTYPE.A,rdata=A(ip),ttl=60))
+                except Exception as e:
                     pass
 
+                if a:
+                    try:
+                        sock.sendto(a, address)
+                    except OSError:
+                        pass
+
             data = None
+            a = None
         except KeyboardInterrupt as e:
             print(f"\nCleaning up")
             sock.close()
