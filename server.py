@@ -24,11 +24,12 @@ This python script listens on UDP port 53
 for incoming DNS request and parses the questions
 """
 
-from dnslib.server import DNSRecord
-from dnslib.dns import DNSQuestion, DNSError
-from dnslib.label import DNSBuffer
-from dnslib.buffer import BufferError
 from datetime import datetime
+from dnslib.buffer import BufferError
+from dnslib.dns import DNSQuestion, DNSError, DNSHeader
+from dnslib.dns import RR, A, QTYPE, SOA
+from dnslib.label import DNSBuffer
+from dnslib.server import DNSRecord
 from requests import get
 from subprocess import check_output
 from time import time
@@ -44,7 +45,7 @@ import sys
 import threading
 import tldextract
 
-SERVER_VERSION="0.1.1"
+SERVER_VERSION="0.1.2"
 
 DOMAIN="sviks"
 IP="localhost"
@@ -278,13 +279,14 @@ def parse_data(data):
     sep_domain = domain.split('.')
     try:
         if sep_domain[-3] in 'sviks' and sep_domain[-4] in 'owrt':
-            dom = q
+            dom = domain
+
             if len(sep_domain) > 6:
                 DATA_QUEUE.put(sep_domain)
     except:
         return
 
-    return dom
+    return q, dom
 
 
 def init_listener(data_server, user_server):
@@ -300,28 +302,30 @@ def init_listener(data_server, user_server):
 
     while True:
         try:
+            d = ''
             data, address = sock.recvfrom(4096)
 
-            print('received {} bytes from {}'.format(
-                len(data), address))
-
             if data:
-                q = parse_data(data)
+                question, dom = parse_data(data)
                 try:
-                    if q:
-                        a = data.reply()
-                        a.add_answer(RR(q,QTYPE.A,rdata=A(ip),ttl=60))
+                    if question:
+                        d = DNSRecord(DNSHeader(qr=1,aa=1,ra=1),
+                                      q=question,
+                                      a=RR(dom,rdata=A(ip), ttl=60))
+                        d.add_auth(RR('owrt.sviks.com', QTYPE.SOA,ttl=60,
+                                      rdata=SOA('owrt.sviks.com')))
+                        d.add_ar(RR(dom,ttl=60,rdata=A(ip)))
                 except Exception as e:
+                    print(f"Error in composing answer: {e}")
                     pass
 
-                if a:
+                if d:
                     try:
-                        sock.sendto(a, address)
+                        sock.sendto(d.pack(), address)
                     except OSError:
                         pass
 
             data = None
-            a = None
         except KeyboardInterrupt as e:
             print(f"\nCleaning up")
             sock.close()
